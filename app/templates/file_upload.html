@@ -1,61 +1,58 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>画像アップロード</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .upload-form {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+        }
+        .preview-image {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        .submit-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .submit-button:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-    <h2>画像アップロード</h2>
-    <form id="upload-form" enctype="multipart/form-data">
-        <input type="file" id="image" name="image" accept="image/*" required>
-        <button type="button" onclick="uploadImage()">アップロード</button>
-    </form>
-    <br>
-    <div id="result">
-        <h3>加工後の画像:</h3>
-        <img id="processed-image" style="max-width: 100%; height: auto;">
+    <div class="upload-form">
+        <h2>二重まぶた画像処理</h2>
+        <form action="/process-image" method="post" enctype="multipart/form-data">
+            <input type="file" name="example" accept="image/*" onchange="previewImage(event)">
+            <br>
+            <img id="preview" class="preview-image" style="display: none;">
+            <br>
+            <input type="submit" value="処理開始" class="submit-button">
+        </form>
     </div>
-    
+
     <script>
-        function uploadImage() {
-            const form = document.getElementById('upload-form');
-            const formData = new FormData(form);
-            
-            // フォームデータの内容を確認
-            console.log("フォーム要素:", form);
-            console.log("FormDataオブジェクト:", formData);
-            
-            // 選択された画像ファイルの情報を確認
-            const imageFile = document.getElementById('image').files[0];
-            console.log("選択された画像ファイル:", imageFile);
-            console.log("ファイル名:", imageFile.name);
-            console.log("ファイルサイズ:", imageFile.size, "bytes");
-            console.log("ファイルタイプ:", imageFile.type);
-            
-            fetch('http://localhost:5000/process-image', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                console.log("サーバーからのレスポンス:", response);
-                if (!response.ok) {
-                    return response.json().then(err => { 
-                        console.error("エラーレスポンス:", err);
-                        throw new Error(err.error); 
-                    });
-                }
-                return response.blob();
-            })
-            .then(blob => {
-                console.log("処理された画像データ:", blob);
-                const imgUrl = URL.createObjectURL(blob);
-                document.getElementById('processed-image').src = imgUrl;
-            })
-            .catch(error => {
-                console.error("エラー発生:", error);
-                alert("エラー: " + error.message);
-            });
+        function previewImage(event) {
+            var reader = new FileReader();
+            reader.onload = function() {
+                var preview = document.getElementById('preview');
+                preview.src = reader.result;
+                preview.style.display = 'block';
+            }
+            reader.readAsDataURL(event.target.files[0]);
         }
     </script>
 </body>

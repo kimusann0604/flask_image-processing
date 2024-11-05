@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>処理結果</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .result-container {
+            text-align: center;
+        }
+        .image-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .image-box {
+            flex: 1;
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        .result-image {
+            max-width: 100%;
+            height: auto;
+        }
+        .back-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        .back-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="result-container">
+        <h2>処理結果</h2>
+        <p>{{ result }}</p>
+        
+        <div class="image-container">
+            {% if original_filename %}
+            <div class="image-box">
+                <h3>元の画像</h3>
+                <img src="/{{ original_filename }}" class="result-image">
+            </div>
+            {% endif %}
+            
+            {% if processed_filename %}
+            <div class="image-box">
+                <h3>処理後の画像</h3>
+                <img src="/{{ processed_filename }}" class="result-image">
+            </div>
+            {% endif %}
+        </div>
+        
+        <a href="/process-image" class="back-button">新しい画像を処理する</a>
+    </div>
+</body>
+</html>
