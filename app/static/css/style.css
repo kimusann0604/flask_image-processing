@@ -1,0 +1,99 @@
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #F5F5F5;
+    color: #333333;
+  }
+  header {
+    background-color: #D3D3D3;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .logo {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333333;
+  }
+  nav a {
+    color: white;
+    text-decoration: none;
+    margin-left: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+  }
+  .sign-in {
+    background-color: #696969;
+  }
+  .contact {
+    background-color: #A9A9A9;
+  }
+  main {
+    padding: 2rem;
+  }
+  .hero {
+    text-align: left;
+    padding: 2rem;
+    background-color: #E6F3FF;
+    border-radius: 10px;
+    margin: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .hero h1 {
+    color: #333333;
+    margin: 0px 0px 0px 40px;
+    font-size: 55px;
+  }
+  .hero p {
+    color: #696969;
+    margin-bottom: 1rem;
+    font-size: 22px;
+    margin: 0px 0px 0px 40px;
+  }
+  .button {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background-color: #FF69B4;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    margin: 22px 0px 0px 40px;
+  
+    
+  }
+  .features {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    background-color: white;
+    padding: 1rem;
+    border-radius: 10px;
+  }
+  .feature {
+    flex: 1;
+    margin: 1rem;
+    padding: 1rem;
+    border: 1px solid #D3D3D3;
+    border-radius: 5px;
+    text-align: center;
+  }
+  .feature h3 {
+    color: #FF69B4;
+  }
+  footer {
+    background-color: #333333;
+    color: white;
+    text-align: center;
+    padding: 1rem;
+    margin-top: 2rem;
+  }
+  .image img {
+    height: auto;
+  }
+    

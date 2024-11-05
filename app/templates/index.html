@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Venus - 整形シミュレーター</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <header>
+        <div class="logo">Venus</div>
+        <nav>
+            <a href="login.php" class="sign-in">サインイン</a>
+            <a href="#" class="contact">お問い合わせ</a>
+        </nav>
+    </header>
+    <main>
+        <section class="hero">
+            <div class="font_hero">
+                <h1>整形シミュレーター</h1>
+                <p>AI美容整形シミュレーション機能を使用し、<br>施術前後のイメージをわかりやすく表現します。</p>
+                <a href="/eye-process" method = 'get'  class="button">眼瞼下垂</a>
+                <a href="/process-image" method = 'get' class="button">二重整形</a>
+            </div>
+            <figure class="image">
+                <img src="{{ url_for('static', filename='img/2024-09-03-16-27-1.png') }}" alt="" width="400" height="400">
+            </figure>
+        </section>
+        <section class="features">
+            <div class="feature">
+                <h3>まぶた</h3>
+                <p>二重の整形のシミュzレーションをすることで施術後のイメージがしやすくなる</p>
+            </div>
+            <div class="feature">
+                <h3>鼻</h3>
+                <p>鼻の形を変更し、理想の鼻のラインをシミュレーションします。</p>
+            </div>
+            <div class="feature">
+                <h3>あご</h3>
+                <p>あごの形状を調整し、輪郭の変化をシミュレーションします。</p>
+            </div>
+            
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2024 Venus 整形シミュレーター. All rights reserved.</p>
+    </footer>
+</body>
+
+</html>
+

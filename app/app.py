@@ -5,19 +5,17 @@ import cv2
 import numpy as np
 import os
 from io import BytesIO
+import tempfile
+from PIL import Image
+import io
+import base64
 
 
-app = Flask(__name__, static_folder='./img')  # static_folderをappディレクトリに設定
-
-UPLOAD_FOLDER = 'app/img'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# if not os.path.exists(UPLOAD_FOLDER):
-#     os.makedirs(UPLOAD_FOLDER)
+app = Flask(__name__)  
     
 @app.route('/')
 def hello():
-    return ('hello word')
+    return render_template('index.html')
 
 class FaceLandmarkProcessor:
     def __init__(self, aws_access_key_id, aws_secret_access_key, region_name='ap-northeast-1'):
@@ -110,78 +108,256 @@ class FaceLandmarkProcessor:
 @app.route('/process-image', methods=['GET', 'POST'])
 def process_image():
     if request.method == 'GET':
-        return render_template('file_upload.html')
+        return render_template('results.html', img_data=None, result="ファイルをアップロードしてください")
     
     elif request.method == 'POST':
         try:
             if 'example' not in request.files:
-                return jsonify({"error": "ファイルがアップロードされていません"}), 400
+                return render_template('results.html', img_data=None, result="ファイルがアップロードされていません")
                 
             file = request.files['example']
             if file.filename == '':
-                return jsonify({"error": "ファイルが選択されていません"}), 400
+                return render_template('results.html', img_data=None, result="ファイルが選択されていません")
 
-            # ファイル名の安全性確保
-            from werkzeug.utils import secure_filename
-            filename = secure_filename(file.filename)
+            # ファイルをバイナリデータに変換
+            image_bytes = file.read()
             
-            # オリジナル画像の保存
-            original_path = os.path.join(app.config['UPLOAD_FOLDER'], f'original_{filename}')
-            file.save(original_path)
-            
-            # 画像を読み込み
-            with open(original_path, 'rb') as f:
-                image_bytes = f.read()
-
             # AWS認証情報の確認
             aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
             aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
             if not aws_access_key_id or not aws_secret_access_key:
-                return jsonify({"error": "AWS認証情報が設定されていません"}), 500
+                return render_template('results.html', img_data=None, result="AWS認証情報が設定されていません")
 
-            # 顔認識処理
+            # Rekognitionによる顔認識
             face_processor = FaceLandmarkProcessor(
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key
             )
-
-            # 画像処理
-            image_np = np.frombuffer(image_bytes, np.uint8)
-            image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
-            if image is None:
-                return jsonify({"error": "画像の読み込みに失敗しました"}), 400
-
-            height, width = image.shape[:2]
             response = face_processor.detect_faces_landmark(image_bytes)
             
-            if 'FaceDetails' in response and len(response['FaceDetails']) > 0:
-                face_processor.draw_landmarks(image, response['FaceDetails'], height, width)
-    
-                # 処理済み画像の保存
-                processed_filename = f'processed_{filename}'
-                processed_path = os.path.join(app.config['UPLOAD_FOLDER'], processed_filename)
-                cv2.imwrite(processed_path, image)
-                
-                # URLを生成（imgディレクトリからの相対パス）
-                original_url = f'img/original_{filename}'
-                processed_url = f'img/processed_{filename}'
-                
-                return render_template('results.html', 
-                                     original_filename=original_url,
-                                     processed_filename=processed_url,
-                                     result="顔認識処理が完了しました")
-            else:
-                return render_template('results.html',
-                                     original_filename=f'img/original_{filename}',
-                                     result="顔を検出できませんでした")
+            # PILで画像を読み込み、OpenCV形式に変換
+            image = Image.open(BytesIO(image_bytes))
+            image_np = np.array(image)
+            image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
-        except Exception as e:
-            app.logger.error(f"Error processing image: {str(e)}")
-            return jsonify({"error": f"画像処理中にエラーが発生しました: {str(e)}"}), 500
+            if 'FaceDetails' in response and len(response['FaceDetails']) > 0:
+                height, width = image_np.shape[:2]
+                face_processor.draw_landmarks(image_np, response['FaceDetails'], height, width)
+
+                # 処理済み画像をbase64にエンコードして埋め込み表示
+                _, buffer = cv2.imencode('.png', image_np)
+                img_base64 = base64.b64encode(buffer).decode('utf-8')
+                img_data_uri = f"data:image/png;base64,{img_base64}"
+
+                return render_template('results.html', img_data=img_data_uri, result="顔認識処理が完了しました")
         
-@app.route('/results_2.html')
-def index():
-    return render_template('results_2.html')
+        except Exception as e:
+            return render_template('results.html', img_data=None, result=f"エラーが発生しました: {str(e)}")
+        
+
+
+class FaceLandmarkProcessor2:
+    def __init__(self, aws_access_key_id, aws_secret_access_key, region_name='ap-northeast-1'):
+        self.rekognition_client = boto3.client(
+            'rekognition',
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            region_name=region_name
+        )
+    
+    def detect_faces_landmark(self, image_bytes):
+        """
+        画像バイトデータから顔のランドマークを検出
+        """
+        try:
+            faces = self.rekognition_client.detect_faces(
+                Image={'Bytes': image_bytes},
+                Attributes=['ALL']
+            )
+            
+            if not faces['FaceDetails']:
+                raise ValueError("顔が検出されませんでした")
+                
+            landmarks = faces['FaceDetails'][0]['Landmarks']
+            eye_types = ['leftEyeLeft', 'leftEyeRight', 'leftEyeUp', 'leftEyeDown',
+                        'rightEyeLeft', 'rightEyeRight', 'rightEyeUp', 'rightEyeDown']
+            
+            # OpenCV画像に変換
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            h, w = img.shape[:2]
+            
+            return {
+                'landmarks': {
+                    landmark['Type']: {'X': int(landmark['X'] * w), 'Y': int(landmark['Y'] * h)}
+                    for landmark in landmarks if landmark['Type'] in eye_types
+                },
+                'image': img
+            }
+        except Exception as e:
+            raise Exception(f"顔認識処理でエラーが発生しました: {str(e)}")
+
+    def mosaic_area(self, src, x, y, width, height, blur_num):
+        """
+        指定された領域にモザイク処理を適用
+        """
+        dst = src.copy()
+        if x < 0 or y < 0 or x + width > src.shape[1] or y + height > src.shape[0]:
+            return dst
+        
+        for _ in range(blur_num):
+            dst[y:y + height, x:x + width] = cv2.GaussianBlur(
+                dst[y:y + height, x:x + width], (3, 3), 3
+            )
+        return dst
+
+    def process_image(self, image_data, magnification=1.5, blur_num=3):
+        """
+        画像処理のメイン関数
+        """
+        try:
+            result = self.detect_faces_landmark(image_data)
+            im = result['image']
+            eye_points = result['landmarks']
+            
+            # 目の周辺領域の調整用パラメータ
+            padding_x, padding_y = 20, 5
+            
+            # 左目の処理
+            left_coords = {
+                'top': min(eye_points[key]['Y'] for key in ['leftEyeUp', 'leftEyeDown', 'leftEyeRight', 'leftEyeLeft']),
+                'bottom': max(eye_points[key]['Y'] for key in ['leftEyeUp', 'leftEyeDown', 'leftEyeRight', 'leftEyeLeft']),
+                'right': max(eye_points[key]['X'] for key in ['leftEyeUp', 'leftEyeDown', 'leftEyeRight', 'leftEyeLeft']),
+                'left': min(eye_points[key]['X'] for key in ['leftEyeUp', 'leftEyeDown', 'leftEyeRight', 'leftEyeLeft'])
+            }
+            
+            # 右目の処理
+            right_coords = {
+                'top': min(eye_points[key]['Y'] for key in ['rightEyeUp', 'rightEyeDown', 'rightEyeRight', 'rightEyeLeft']),
+                'bottom': max(eye_points[key]['Y'] for key in ['rightEyeUp', 'rightEyeDown', 'rightEyeRight', 'rightEyeLeft']),
+                'right': max(eye_points[key]['X'] for key in ['rightEyeUp', 'rightEyeDown', 'rightEyeRight', 'rightEyeLeft']),
+                'left': min(eye_points[key]['X'] for key in ['rightEyeUp', 'rightEyeDown', 'rightEyeRight', 'rightEyeLeft'])
+            }
+            
+            # 左目の拡大処理
+            left_eye = im[left_coords['top']:left_coords['bottom']+padding_y,
+                         left_coords['left']-padding_x:left_coords['right']+padding_x]
+            left_eye = cv2.resize(left_eye, 
+                                (left_eye.shape[1], 
+                                 int(left_eye.shape[0]*magnification)))
+            
+            # 右目の拡大処理
+            right_eye = im[right_coords['top']:right_coords['bottom']+padding_y,
+                          right_coords['left']-padding_x:right_coords['right']+padding_x]
+            right_eye = cv2.resize(right_eye,
+                                 (right_eye.shape[1],
+                                  int(right_eye.shape[0]*magnification)))
+            
+            # 拡大した目を元の画像に配置
+            im[left_coords['top']:left_coords['top']+left_eye.shape[0],
+               left_coords['left']-padding_x:left_coords['left']+left_eye.shape[1]-padding_x] = left_eye
+            
+            im[right_coords['top']:right_coords['top']+right_eye.shape[0],
+               right_coords['left']-padding_x:right_coords['left']+right_eye.shape[1]-padding_x] = right_eye
+            
+            # ぼかし処理を適用する領域の定義
+            blur_areas = [
+                # 左目周辺
+                (left_coords['left']-padding_x-int(padding_x/2),
+                 left_coords['top'],
+                 padding_x,
+                 left_eye.shape[0]+padding_y),
+                
+                (left_coords['right']+int(padding_x/2),
+                 left_coords['top'],
+                 padding_x,
+                 left_eye.shape[0]+padding_y),
+                
+                (left_coords['left']-padding_x,
+                 left_coords['top']+left_eye.shape[0]-int(padding_y/2),
+                 left_eye.shape[1],
+                 padding_y),
+                
+                # 右目周辺
+                (right_coords['left']-padding_x-int(padding_x/2),
+                 right_coords['top'],
+                 padding_x,
+                 right_eye.shape[0]+padding_y),
+                
+                (right_coords['right']+int(padding_x/2),
+                 right_coords['top'],
+                 padding_x,
+                 right_eye.shape[0]+padding_y),
+                
+                (right_coords['left']-padding_x,
+                 right_coords['top']+right_eye.shape[0]-int(padding_y/2),
+                 right_eye.shape[1],
+                 padding_y)
+            ]
+            
+            # 各領域にぼかし処理を適用
+            for area in blur_areas:
+                im = self.mosaic_area(im, *area, blur_num)
+            
+            return im
+            
+        except Exception as e:
+            raise Exception(f"画像処理でエラーが発生しました: {str(e)}")
+
+
+
+@app.route('/eye-process', methods=['GET', 'POST'])
+def eye_process():
+    if request.method == 'GET':
+        return render_template('results.html',
+                             img_data=None,
+                             result="ファイルをアップロードしてください")
+    
+    try:
+        if 'example' not in request.files:
+            return render_template('results.html',
+                                 img_data=None,
+                                 result="ファイルがアップロードされていません")
+        
+        file = request.files['example']
+        if file.filename == '':
+            return render_template('results.html',
+                                 img_data=None,
+                                 result="ファイルが選択されていません")
+        
+        # ファイルをバイナリデータとして読み込み
+        image_bytes = file.read()
+        
+        # AWS認証情報の取得
+        aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+        
+        if not aws_access_key_id or not aws_secret_access_key:
+            return render_template('results.html',
+                                 img_data=None,
+                                 result="AWS認証情報が設定されていません")
+        
+        # 画像処理の実行
+        processor = FaceLandmarkProcessor2(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key
+        )
+        
+        processed_image = processor.process_image(image_bytes)
+        
+        # 処理済み画像をbase64エンコード
+        _, buffer = cv2.imencode('.png', processed_image)
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+        img_data_uri = f"data:image/png;base64,{img_base64}"
+        
+        return render_template('results.html',
+                             img_data=img_data_uri,
+                             result="画像処理が完了しました")
+    
+    except Exception as e:
+        return render_template('results.html',
+                             img_data=None,
+                             result=f"エラーが発生しました: {str(e)}")
 
 if __name__ == "__main__":
     app.run(debug=True, port=5003)
