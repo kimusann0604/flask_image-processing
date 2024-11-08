@@ -156,7 +156,7 @@ def process_image():
         
 
 
-class FaceLandmarkProcessor2:
+class PtosisCorrection:
     def __init__(self, aws_access_key_id, aws_secret_access_key, region_name='ap-northeast-1'):
         self.rekognition_client = boto3.client(
             'rekognition',
@@ -165,7 +165,7 @@ class FaceLandmarkProcessor2:
             region_name=region_name
         )
     
-    def detect_faces_landmark(self, image_bytes):
+    def detect_eye_landmarks(self, image_bytes):
         """
         画像バイトデータから顔のランドマークを検出
         """
@@ -177,23 +177,26 @@ class FaceLandmarkProcessor2:
             
             if not faces['FaceDetails']:
                 raise ValueError("顔が検出されませんでした")
-                
+            
+            # 顔のランドマークを表示
             landmarks = faces['FaceDetails'][0]['Landmarks']
-            eye_types = ['leftEyeLeft', 'leftEyeRight', 'leftEyeUp', 'leftEyeDown',
+            eye_points = ['leftEyeLeft', 'leftEyeRight', 'leftEyeUp', 'leftEyeDown',
                         'rightEyeLeft', 'rightEyeRight', 'rightEyeUp', 'rightEyeDown']
             
-            # OpenCV画像に変換
-            nparr = np.frombuffer(image_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            # 画像データに適したものにするためにnumpy配列にしている
+            binary_image_data = np.frombuffer(image_bytes, dtype=np.uint8)
+            img = cv2.imdecode(binary_image_data, cv2.IMREAD_COLOR)
             h, w = img.shape[:2]
             
             return {
                 'landmarks': {
                     landmark['Type']: {'X': int(landmark['X'] * w), 'Y': int(landmark['Y'] * h)}
-                    for landmark in landmarks if landmark['Type'] in eye_types
+                    for landmark in landmarks if landmark['Type'] in eye_points
                 },
                 'image': img
             }
+                
         except Exception as e:
             raise Exception(f"顔認識処理でエラーが発生しました: {str(e)}")
 
@@ -216,7 +219,7 @@ class FaceLandmarkProcessor2:
         画像処理のメイン関数
         """
         try:
-            result = self.detect_faces_landmark(image_data)
+            result = self.detect_eye_landmarks(image_data)
             im = result['image']
             eye_points = result['landmarks']
             
@@ -305,9 +308,8 @@ class FaceLandmarkProcessor2:
             raise Exception(f"画像処理でエラーが発生しました: {str(e)}")
 
 
-
 @app.route('/eye-process', methods=['GET', 'POST'])
-def eye_process():
+def process_image():
     if request.method == 'GET':
         return render_template('results.html',
                              img_data=None,
@@ -318,9 +320,14 @@ def eye_process():
             return render_template('results.html',
                                  img_data=None,
                                  result="ファイルがアップロードされていません")
-        
+        # print(request.files)
+        #出力：ImmutableMultiDict([('example', <FileStorage: 'image.jpg' ('image/jpeg')>)])
+        # request.filesの中に画像のデータが入っている
         file = request.files['example']
+        print(file)
+        # 出力：<FileStorage: 'bbc6c9066fa41d8de797b46e34d91a39.jpg' ('image/jpeg')>
         if file.filename == '':
+            # もしファイルの中にファイルが選択されていなかったら
             return render_template('results.html',
                                  img_data=None,
                                  result="ファイルが選択されていません")
@@ -338,7 +345,7 @@ def eye_process():
                                  result="AWS認証情報が設定されていません")
         
         # 画像処理の実行
-        processor = FaceLandmarkProcessor2(
+        processor = PtosisCorrection(
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key
         )
