@@ -328,15 +328,15 @@ class PtosisCorrection:
 @app.route('/eye-process', methods=['GET', 'POST'])
 #/eye-processにアクセスし、画像をアップロードすることでPOSTを実行その後顔認証
 
-def process_image():
+def process():
     if request.method == 'GET':
-        return render_template('results.html',
+        return render_template('results2.html',
                              img_data=None,
                              result="ファイルをアップロードしてください")
     
     try:
         if 'example' not in request.files:
-            return render_template('results.html',
+            return render_template('results2.html',
                                  img_data=None,
                                  result="ファイルがアップロードされていません")
         # print(request.files)
@@ -347,7 +347,7 @@ def process_image():
         # 出力：<FileStorage: 'bbc6c9066fa41d8de797b46e34d91a39.jpg' ('image/jpeg')>
         if file.filename == '':
             # もしファイルの中にファイルが選択されていなかったら
-            return render_template('results.html',
+            return render_template('results2.html',
                                  img_data=None,
                                  result="ファイルが選択されていません")
         
@@ -359,7 +359,7 @@ def process_image():
         aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
         
         if not aws_access_key_id or not aws_secret_access_key:
-            return render_template('results.html',
+            return render_template('results2.html',
                                  img_data=None,
                                  result="AWS認証情報が設定されていません")
         
@@ -376,14 +376,14 @@ def process_image():
         img_base64 = base64.b64encode(buffer).decode('utf-8')
         img_data_uri = f"data:image/png;base64,{img_base64}"
         
-        return render_template('results.html',
+        return render_template('results2.html',
                              img_data=img_data_uri,
                              result="画像処理が完了しました")
     
     except Exception as e:
-        return render_template('results.html',
+        return render_template('results2.html',
                              img_data=None,
                              result=f"エラーが発生しました: {str(e)}")
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5003)
+    app.run(debug=True, port=5004)
