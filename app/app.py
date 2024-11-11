@@ -18,7 +18,11 @@ def hello():
     return render_template('index.html')
 
 class FaceLandmarkProcessor:
+    ''''二重を作成するclass'''
+    
     def __init__(self, aws_access_key_id, aws_secret_access_key, region_name='ap-northeast-1'):
+        #awsのアクセスキーをosから読み込む
+        
         self.rekognition_client = boto3.client(
             'rekognition',
             aws_access_key_id=aws_access_key_id,
@@ -27,6 +31,8 @@ class FaceLandmarkProcessor:
         )
     
     def detect_faces_landmark(self, image_bytes):
+        #顔認証をするための関数
+        
         response = self.rekognition_client.detect_faces(
             Image={'Bytes': image_bytes}, 
             Attributes=['ALL']
@@ -34,6 +40,8 @@ class FaceLandmarkProcessor:
         return response
 
     def draw_double_eye_ellipse(self, img, eye_center, size, angle, start_angle, end_angle, color=(68, 92, 135), thickness=2):
+        #opencvの描画機能で二重の線を描く
+        
         cv2.ellipse(
             img,
             eye_center,
@@ -46,6 +54,8 @@ class FaceLandmarkProcessor:
         )
 
     def left_eye_point(self, landmarks):
+        #左目、４点の座標を取ってくる
+        
         left_eye_left = landmarks['leftEyeLeft']
         left_eye_right = landmarks['leftEyeRight']
         left_eye_up = landmarks['leftEyeUp']
@@ -53,6 +63,8 @@ class FaceLandmarkProcessor:
         return left_eye_left, left_eye_right, left_eye_up, left_eye_down
     
     def right_eye_point(self, landmarks):
+        #右目、４点の座標を取ってくる
+        
         right_eye_left = landmarks['rightEyeLeft']
         right_eye_right = landmarks['rightEyeRight']
         right_eye_up = landmarks['rightEyeUp']
@@ -60,6 +72,8 @@ class FaceLandmarkProcessor:
         return right_eye_left, right_eye_right, right_eye_up, right_eye_down
     
     def calculate_Eye_Position_Draw(self, image, landmarks, roll_angle, height_factor=0.99):
+        #二重線の位置を調整するための関数
+        
         left_eye_left, left_eye_right, left_eye_up, left_eye_down = self.left_eye_point(landmarks)
         right_eye_left, right_eye_right, right_eye_up, right_eye_down = self.right_eye_point(landmarks)
         
@@ -95,6 +109,7 @@ class FaceLandmarkProcessor:
                                     roll_angle, start_angle, end_angle, color=(68, 92, 135), thickness=2)
         
     def draw_landmarks(self, image, face_details, height, width):
+        #ランドマークの情報を読み込み、首の傾きから線を傾かせる
         for face_detail in face_details:
             landmarks = {landmark['Type']: (int(landmark['X'] * width), int(landmark['Y'] * height)) 
                         for landmark in face_detail['Landmarks']}
@@ -106,18 +121,20 @@ class FaceLandmarkProcessor:
 
 
 @app.route('/process-image', methods=['GET', 'POST'])
+#/process-imageにアクセスし、ボタンを押すことでPOSTを実行。その後画像処理
+
 def process_image():
     if request.method == 'GET':
-        return render_template('results.html', img_data=None, result="ファイルをアップロードしてください")
+        return render_template('results.html')
     
     elif request.method == 'POST':
         try:
             if 'example' not in request.files:
-                return render_template('results.html', img_data=None, result="ファイルがアップロードされていません")
+                return render_template('results.html', img_data=None, result="ファイルがアップロードされていない")
                 
             file = request.files['example']
             if file.filename == '':
-                return render_template('results.html', img_data=None, result="ファイルが選択されていません")
+                return render_template('results.html', img_data=None, result="ファイルが選択されていない")
 
             # ファイルをバイナリデータに変換
             image_bytes = file.read()
@@ -157,6 +174,8 @@ def process_image():
 
 
 class PtosisCorrection:
+    '''眼瞼下垂を行うためのclass'''
+    
     def __init__(self, aws_access_key_id, aws_secret_access_key, region_name='ap-northeast-1'):
         self.rekognition_client = boto3.client(
             'rekognition',
@@ -166,9 +185,8 @@ class PtosisCorrection:
         )
     
     def detect_eye_landmarks(self, image_bytes):
-        """
-        画像バイトデータから顔のランドマークを検出
-        """
+        #画像バイトデータから顔のランドマークを検出
+        
         try:
             faces = self.rekognition_client.detect_faces(
                 Image={'Bytes': image_bytes},
@@ -200,24 +218,23 @@ class PtosisCorrection:
         except Exception as e:
             raise Exception(f"顔認識処理でエラーが発生しました: {str(e)}")
 
-    def mosaic_area(self, src, x, y, width, height, blur_num):
-        """
-        指定された領域にモザイク処理を適用
-        """
+    def mosaic_area(self, src, x, y, width, height, mosaic):
+        #指定された領域にモザイク処理を適用
+        
         dst = src.copy()
         if x < 0 or y < 0 or x + width > src.shape[1] or y + height > src.shape[0]:
             return dst
         
-        for _ in range(blur_num):
+        for _ in range(mosaic):
             dst[y:y + height, x:x + width] = cv2.GaussianBlur(
                 dst[y:y + height, x:x + width], (3, 3), 3
             )
         return dst
 
-    def process_image(self, image_data, magnification=1.5, blur_num=3):
-        """
-        画像処理のメイン関数
-        """
+    def process_image(self, image_data, eye_magnification=1.5, mosaic=3):
+        #eye_magnificationの数値を変えることで標準の目の大きさを変更
+        #mosaicの数値を変更することでモザイクの範囲を設定
+        
         try:
             result = self.detect_eye_landmarks(image_data)
             im = result['image']
@@ -247,14 +264,14 @@ class PtosisCorrection:
                          left_coords['left']-padding_x:left_coords['right']+padding_x]
             left_eye = cv2.resize(left_eye, 
                                 (left_eye.shape[1], 
-                                 int(left_eye.shape[0]*magnification)))
+                                 int(left_eye.shape[0]* eye_magnification)))
             
             # 右目の拡大処理
             right_eye = im[right_coords['top']:right_coords['bottom']+padding_y,
                           right_coords['left']-padding_x:right_coords['right']+padding_x]
             right_eye = cv2.resize(right_eye,
                                  (right_eye.shape[1],
-                                  int(right_eye.shape[0]*magnification)))
+                                  int(right_eye.shape[0]* eye_magnification)))
             
             # 拡大した目を元の画像に配置
             im[left_coords['top']:left_coords['top']+left_eye.shape[0],
@@ -300,7 +317,7 @@ class PtosisCorrection:
             
             # 各領域にぼかし処理を適用
             for area in blur_areas:
-                im = self.mosaic_area(im, *area, blur_num)
+                im = self.mosaic_area(im, *area, mosaic)
             
             return im
             
@@ -309,6 +326,8 @@ class PtosisCorrection:
 
 
 @app.route('/eye-process', methods=['GET', 'POST'])
+#/eye-processにアクセスし、画像をアップロードすることでPOSTを実行その後顔認証
+
 def process_image():
     if request.method == 'GET':
         return render_template('results.html',
@@ -352,7 +371,7 @@ def process_image():
         
         processed_image = processor.process_image(image_bytes)
         
-        # 処理済み画像をbase64エンコード
+        # 画像をbase64エンコードし、HTMLに読み込む
         _, buffer = cv2.imencode('.png', processed_image)
         img_base64 = base64.b64encode(buffer).decode('utf-8')
         img_data_uri = f"data:image/png;base64,{img_base64}"
