@@ -1,0 +1,18 @@
+<html>
+    <body>
+        {% if img_data %}
+	    <IMG SRC="{{ img_data }}" alt="Processed Image" />
+        {% endif %}
+
+        {% if img_data %}
+        <div class="message">{{ result }}</div> 
+        <hr>
+        {% endif %}
+ 
+        <h3>画像をアップロード</h3>
+    <form action="/eye-process" method="POST" enctype="multipart/form-data">
+        <input type="file" name="example" accept="image/*">
+        <input type="submit" value="アップロード">
+    </form>
+</body>
+</html>
